@@ -4,21 +4,76 @@ from pysat.formula import CNF
 class VecEnc:
 
     @classmethod
-    def lex_leq(cls, a, b, top_id=None, vpool=None): # assuming a and b have the same size
+    def lex_leq(cls, a, b, top_id=None, vpool=None):
+        """
+            Create a CNF encoding of the lexicographic ordering constraint
+            ``a <=lex b`` over two vectors of literals. The first position
+            is the most significant one, and false is smaller than true.
+            The vectors may have different lengths: if one of them is a
+            prefix of the other, the shorter one is smaller, as with Python
+            tuples.
+
+            Helper variables are numbered above ``top_id``, or taken from
+            ``vpool``. The two cannot be given at the same time.
+
+            :param a: the left-hand side vector of literals.
+            :param b: the right-hand side vector of literals.
+            :param top_id: the largest variable identifier used so far.
+            :param vpool: pool of variable identifiers to take the helper
+                variables from.
+
+            :type a: list(int)
+            :type b: list(int)
+            :type top_id: int or None
+            :type vpool: :class:`pysat.formula.IDPool` or None
+
+            :raises ValueError: if a vector contains something other than a
+                non-zero integer.
+
+            :rtype: :class:`pysat.formula.CNF`
+
+            Example:
+
+            .. code-block:: python
+
+                >>> from pysat.vector import VecEnc
+                >>> cnf = VecEnc.lex_leq([1, 2], [3, 4])
+                >>> print(cnf.clauses)
+                [[-1, 3], [-1, 5], [3, 5], [-5, -2, 4]]
+                >>> print(cnf.nv)
+                5
+        """
+
         assert not top_id or not vpool, (
             'Use either a top id or a pool of variables but not both.')
-        
-        top_id = max(abs(l) for l in a + b + [top_id if top_id != None else 0])
-        l = len(a)
+
+        for lit in a + b:
+            if not isinstance(lit, int) or lit == 0:
+                raise ValueError('Not a literal: {0!r}'.format(lit))
+
+        if top_id is None:
+            top_id = 0
+        top_id = max([top_id] + [abs(lit) for lit in a + b])
+
+        # positions are compared up to the end of the shorter vector
+        size = min(len(a), len(b))
+
+        # if a is longer and starts with b, then a is larger, so a <=lex b
+        # needs the common part of a to be strictly smaller
+        strict = len(a) > len(b)
 
         if vpool:
             vpool.top = max(top_id, vpool.top)
-            e = [vpool.id() for _ in range(l - 1)] 
+            e = [vpool.id() for _ in range(size - 1)]
+            nv = vpool.top
         else:
-            e = [i for i in range(top_id + 1, top_id + l)]
+            e = [i for i in range(top_id + 1, top_id + size)]
+            nv = max([top_id] + e)
 
-        cnf = CNF(from_clauses=cls._build_clauses(a, b, e))
-        cnf.nv = max([top_id] + e) # the largest variable used so far
+        clauses = cls._build_clauses(a[:size], b[:size], e, strict)
+
+        cnf = CNF(from_clauses=clauses)
+        cnf.nv = nv  # the largest variable used so far
 
         return cnf
 
