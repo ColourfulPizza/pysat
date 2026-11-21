@@ -23,12 +23,18 @@ class VecEnc:
         return cnf
 
     @classmethod
-    def _build_clauses(cls, a, b, e):
+    def _build_clauses(cls, a, b, e, strict=False):
         """
-            Return the clauses of ``a <=lex b``. ``e[i]`` is a helper
-            variable meaning "a and b are equal on all positions up to
-            ``i``".
+            Return the clauses of ``a <=lex b``, or of ``a <lex b`` if
+            ``strict`` is true, for two vectors of the same length.
+            ``e[i]`` is a helper variable meaning "a and b are equal on all
+            positions up to ``i``".
         """
+
+        if not a:
+            # empty vectors are equal: a non-strict comparison always holds,
+            # and a strict one never does (an empty clause is unsatisfiable)
+            return [[]] if strict else []
 
         clauses = []
         last = len(a) - 1
@@ -41,11 +47,15 @@ class VecEnc:
                 clauses += [prefix + [-a[i], b[i]],
                             prefix + [-a[i], e[i]],
                             prefix + [b[i], e[i]]]
+            elif strict:
+                # a[i] must be false and b[i] must be true
+                clauses += [prefix + [-a[i]],
+                            prefix + [b[i]]]
             else:
-                # the strict version will differ only here
                 clauses.append(prefix + [-a[i], b[i]])
 
         return clauses
+
 
 if __name__ == '__main__':
     a = [-1, 2, 3, 4]
@@ -54,4 +64,3 @@ if __name__ == '__main__':
     res = VecEnc.lex_leq(a, b)
     for x in res:
         print(x)
-
