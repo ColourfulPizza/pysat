@@ -16,7 +16,13 @@ class VecEnc:
         l = len(a)
         e = [i for i in range(top_id + 1, top_id + l)] # store equality
 
-        return cls._build_clauses(a, b, e)
+        cnf = CNF(from_clauses=cls._build_clauses(a, b, e))
+
+        # the largest variable used so far, including the helper variables,
+        # so that callers can number their next variables above it
+        cnf.nv = top_id + len(e)
+
+        return cnf
 
     @classmethod
     def _build_clauses(cls, a, b, e):
