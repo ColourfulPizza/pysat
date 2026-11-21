@@ -13,23 +13,35 @@ class VecEnc:
         if vpool:
             top_id = max(top_id, vpool.top)
         
-        res = []
         l = len(a)
         e = [i for i in range(top_id + 1, top_id + l)] # store equality
 
-        for i in range(l):
-            # a[i] b[i]
-            clause = [[-a[i], b[i]],
-                    [-a[i], e[i]],
-                    [ b[i], e[i]]] if (i != l - 1) else [[-a[i], b[i]]]
+        return cls._build_clauses(a, b, e)
 
-            if i > 0:
-                for cl in clause:
-                    cl.insert(0, -e[i-1])
-            
-            res += clause
+    @classmethod
+    def _build_clauses(cls, a, b, e):
+        """
+            Return the clauses of ``a <=lex b``. ``e[i]`` is a helper
+            variable meaning "a and b are equal on all positions up to
+            ``i``".
+        """
 
-        return res
+        clauses = []
+        last = len(a) - 1
+
+        for i in range(len(a)):
+            # clauses only apply if all previous positions are equal
+            prefix = [-e[i - 1]] if i > 0 else []
+
+            if i < last:
+                clauses += [prefix + [-a[i], b[i]],
+                            prefix + [-a[i], e[i]],
+                            prefix + [b[i], e[i]]]
+            else:
+                # the strict version will differ only here
+                clauses.append(prefix + [-a[i], b[i]])
+
+        return clauses
 
 if __name__ == '__main__':
     a = [-1, 2, 3, 4]
