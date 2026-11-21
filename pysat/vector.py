@@ -44,6 +44,14 @@ class VecEnc:
                 5
         """
 
+        return cls._encode(a, b, False, top_id, vpool)
+
+    @classmethod
+    def lex_lt(cls, a, b, top_id=None, vpool=None):
+        return cls._encode(a, b, True, top_id, vpool)
+
+    @classmethod
+    def _encode(cls, a, b, strict, top_id, vpool):
         assert not top_id or not vpool, (
             'Use either a top id or a pool of variables but not both.')
 
@@ -58,9 +66,10 @@ class VecEnc:
         # positions are compared up to the end of the shorter vector
         size = min(len(a), len(b))
 
-        # if a is longer and starts with b, then a is larger, so a <=lex b
-        # needs the common part of a to be strictly smaller
-        strict = len(a) > len(b)
+        # if a is longer and starts with b, then a is larger
+        # so a <=lex b needs the common part of a to be strictly smaller
+        if len(a) != len(b):
+            strict = len(a) > len(b)
 
         if vpool:
             vpool.top = max(top_id, vpool.top)
