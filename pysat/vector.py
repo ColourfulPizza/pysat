@@ -8,19 +8,17 @@ class VecEnc:
         assert not top_id or not vpool, (
             'Use either a top id or a pool of variables but not both.')
         
-        if not top_id:
-            top_id = max(abs(l) for l in a + b)
-        if vpool:
-            top_id = max(top_id, vpool.top)
-        
+        top_id = max(abs(l) for l in a + b + [top_id if top_id != None else 0])
         l = len(a)
-        e = [i for i in range(top_id + 1, top_id + l)] # store equality
+
+        if vpool:
+            vpool.top = max(top_id, vpool.top)
+            e = [vpool.id() for _ in range(l - 1)] 
+        else:
+            e = [i for i in range(top_id + 1, top_id + l)]
 
         cnf = CNF(from_clauses=cls._build_clauses(a, b, e))
-
-        # the largest variable used so far, including the helper variables,
-        # so that callers can number their next variables above it
-        cnf.nv = top_id + len(e)
+        cnf.nv = max([top_id] + e) # the largest variable used so far
 
         return cnf
 
