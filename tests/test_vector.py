@@ -20,7 +20,13 @@ METHODS = [pytest.param(VecEnc.lex_leq, operator.le, id='lex_leq'),
 # vectors containing something other than a literal
 NOT_LITERALS = [pytest.param([0, 1], [2, 3], id='zero'),
                 pytest.param([1, 2], [3, 1.5], id='float'),
-                pytest.param([1, 'x'], [2, 3], id='string')]
+                pytest.param([1, 'x'], [2, 3], id='string'),
+                pytest.param([True, 2], [3, 4], id='bool')]
+
+# vectors given as other iterables than lists
+ITERABLES = [pytest.param((1, -2), (3, 4), id='tuples'),
+             pytest.param((1, -2), [3, 4], id='tuple_and_list'),
+             pytest.param(range(1, 3), range(3, 5), id='ranges')]
 
 # vectors that share variables or repeat a literal
 SHARED = [pytest.param([1, 2, -3], [2, 1, 3], id='swapped'),
@@ -130,6 +136,25 @@ def test_lex_inputs_unchanged(method):
     a, b = [1, -2, 3], [4, 5]
     method(a, b)
     assert a == [1, -2, 3] and b == [4, 5]
+
+
+@pytest.mark.parametrize('method', ENCODINGS)
+@pytest.mark.parametrize('a, b', ITERABLES)
+def test_lex_iterables(method, a, b):
+    # other iterables give the same encoding as lists
+    assert method(a, b).clauses == method(list(a), list(b)).clauses
+
+
+@pytest.mark.parametrize('method', ENCODINGS)
+def test_lex_numpy(method):
+    numpy = pytest.importorskip('numpy')
+
+    a, b = numpy.array([1, -2]), numpy.array([3, 4])
+    cnf = method(a, b)
+    assert cnf.clauses == method([1, -2], [3, 4]).clauses
+
+    # the clauses contain plain ints, not numpy integers
+    assert all(type(lit) is int for cl in cnf.clauses for lit in cl)
 
 
 @pytest.mark.parametrize('method, compare', METHODS)

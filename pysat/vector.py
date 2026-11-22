@@ -56,6 +56,8 @@
 
 #
 #==============================================================================
+import numbers
+
 from pysat.formula import CNF
 
 
@@ -116,13 +118,13 @@ class VecEnc:
             :param top_id: top variable identifier used so far.
             :param vpool: variable pool for counting the number of variables.
 
-            :type a: list(int)
-            :type b: list(int)
+            :type a: iterable(int)
+            :type b: iterable(int)
             :type top_id: integer or None
             :type vpool: :class:`.IDPool`
 
             :raises ValueError: if a vector contains something other than a
-                non-zero integer.
+                non-zero integer, e.g. ``0`` or ``True``.
 
             :rtype: :class:`pysat.formula.CNF`
 
@@ -156,13 +158,13 @@ class VecEnc:
             :param top_id: top variable identifier used so far.
             :param vpool: variable pool for counting the number of variables.
 
-            :type a: list(int)
-            :type b: list(int)
+            :type a: iterable(int)
+            :type b: iterable(int)
             :type top_id: integer or None
             :type vpool: :class:`.IDPool`
 
             :raises ValueError: if a vector contains something other than a
-                non-zero integer.
+                non-zero integer, e.g. ``0`` or ``True``.
 
             :rtype: :class:`pysat.formula.CNF`
 
@@ -200,7 +202,7 @@ class VecEnc:
             :type vpool: :class:`.IDPool`
 
             :raises ValueError: if a vector contains something other than a
-                non-zero integer.
+                non-zero integer, e.g. ``0`` or ``True``.
 
             :rtype: :class:`pysat.formula.CNF`
         """
@@ -208,9 +210,18 @@ class VecEnc:
         assert not top_id or not vpool, (
             'Use either a top id or a pool of variables but not both.')
 
+        # accept any iterables, e.g. tuples or numpy arrays, and work on new
+        # lists, so that the caller's vectors are never modified
+        a, b = list(a), list(b)
+
         for lit in a + b:
-            if not isinstance(lit, int) or lit == 0:
+            # bool is a subclass of int, but True is not meant as literal 1
+            integral = isinstance(lit, numbers.Integral)
+            if not integral or isinstance(lit, bool) or lit == 0:
                 raise ValueError('Not a literal: {0!r}'.format(lit))
+
+        # integers of other types, e.g. from numpy, become plain ints
+        a, b = [int(lit) for lit in a], [int(lit) for lit in b]
 
         if top_id is None:
             top_id = 0
