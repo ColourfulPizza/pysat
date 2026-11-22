@@ -10,18 +10,23 @@ from pysat.vector import VecEnc
 
 
 # both encodings, for the tests that apply to each of them
-encodings = [VecEnc.lex_leq, VecEnc.lex_lt]
-names = ['lex_leq', 'lex_lt']
+ENCODINGS = [pytest.param(VecEnc.lex_leq, id='lex_leq'),
+             pytest.param(VecEnc.lex_lt, id='lex_lt')]
 
 # each encoding, together with the comparison of tuples it should match
-methods = [(VecEnc.lex_leq, operator.le), (VecEnc.lex_lt, operator.lt)]
+METHODS = [pytest.param(VecEnc.lex_leq, operator.le, id='lex_leq'),
+           pytest.param(VecEnc.lex_lt, operator.lt, id='lex_lt')]
+
+# vectors containing something other than a literal
+NOT_LITERALS = [pytest.param([0, 1], [2, 3], id='zero'),
+                pytest.param([1, 2], [3, 1.5], id='float'),
+                pytest.param([1, 'x'], [2, 3], id='string')]
 
 # vectors that share variables or repeat a literal
-shared = [([1, 2, -3], [2, 1, 3]),
-          ([1, 1], [1, -1]),
-          ([1, -2], [1, -2]),
-          ([-1, 2, 1], [1])]
-shared_names = ['swapped', 'repeated', 'identical', 'longer']
+SHARED = [pytest.param([1, 2, -3], [2, 1, 3], id='swapped'),
+          pytest.param([1, 1], [1, -1], id='repeated'),
+          pytest.param([1, -2], [1, -2], id='identical'),
+          pytest.param([-1, 2, 1], [1], id='longer')]
 
 
 def vectors(n, m):
@@ -50,12 +55,12 @@ def check(method, compare, a, b, **kwargs):
         for bits in product((False, True), repeat=len(inputs)):
             value = dict(zip(inputs, bits))
             assumptions = [v if value[v] else -v for v in inputs]
-            left  = tuple(value[abs(lit)] == (lit > 0) for lit in a)
+            left = tuple(value[abs(lit)] == (lit > 0) for lit in a)
             right = tuple(value[abs(lit)] == (lit > 0) for lit in b)
+            expected = compare(left, right)
 
-            assert solver.solve(assumptions=assumptions) == (
-                compare(left, right)), 'wrong result for {0} and {1}'.format(
-                left, right)
+            assert solver.solve(assumptions=assumptions) == expected, (
+                'wrong result for {0} and {1}'.format(left, right))
 
     return cnf
 
@@ -74,36 +79,34 @@ def test_lex_lt_example():
     assert cnf.nv == 5
 
 
-@pytest.mark.parametrize('method', encodings, ids=names)
-@pytest.mark.parametrize('a, b', [([0, 1], [2, 3]),
-                                  ([1, 2], [3, 1.5]),
-                                  ([1, 'x'], [2, 3])])
+@pytest.mark.parametrize('method', ENCODINGS)
+@pytest.mark.parametrize('a, b', NOT_LITERALS)
 def test_lex_not_literals(method, a, b):
     with pytest.raises(ValueError):
         method(a, b)
 
 
-@pytest.mark.parametrize('method', encodings, ids=names)
+@pytest.mark.parametrize('method', ENCODINGS)
 def test_lex_top_id_and_vpool(method):
     with pytest.raises(AssertionError):
         method([1], [2], top_id=5, vpool=IDPool())
 
 
-@pytest.mark.parametrize('method', encodings, ids=names)
+@pytest.mark.parametrize('method', ENCODINGS)
 def test_lex_inputs_unchanged(method):
     a, b = [1, -2, 3], [4, 5]
     method(a, b)
     assert a == [1, -2, 3] and b == [4, 5]
 
 
-@pytest.mark.parametrize('method, compare', methods, ids=names)
+@pytest.mark.parametrize('method, compare', METHODS)
 @pytest.mark.parametrize('n, m', list(product(range(5), repeat=2)))
 def test_lex_lengths(method, compare, n, m):
     a, b = vectors(n, m)
     check(method, compare, a, b)
 
 
-@pytest.mark.parametrize('method, compare', methods, ids=names)
-@pytest.mark.parametrize('a, b', shared, ids=shared_names)
+@pytest.mark.parametrize('method, compare', METHODS)
+@pytest.mark.parametrize('a, b', SHARED)
 def test_lex_shared_variables(method, compare, a, b):
     check(method, compare, a, b)
