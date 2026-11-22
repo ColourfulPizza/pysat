@@ -16,6 +16,13 @@ names = ['lex_leq', 'lex_lt']
 # each encoding, together with the comparison of tuples it should match
 methods = [(VecEnc.lex_leq, operator.le), (VecEnc.lex_lt, operator.lt)]
 
+# vectors that share variables or repeat a literal
+shared = [([1, 2, -3], [2, 1, 3]),
+          ([1, 1], [1, -1]),
+          ([1, -2], [1, -2]),
+          ([-1, 2, 1], [1])]
+shared_names = ['swapped', 'repeated', 'identical', 'longer']
+
 
 def vectors(n, m):
     """
@@ -93,4 +100,10 @@ def test_lex_inputs_unchanged(method):
 @pytest.mark.parametrize('n, m', list(product(range(5), repeat=2)))
 def test_lex_lengths(method, compare, n, m):
     a, b = vectors(n, m)
+    check(method, compare, a, b)
+
+
+@pytest.mark.parametrize('method, compare', methods, ids=names)
+@pytest.mark.parametrize('a, b', shared, ids=shared_names)
+def test_lex_shared_variables(method, compare, a, b):
     check(method, compare, a, b)
