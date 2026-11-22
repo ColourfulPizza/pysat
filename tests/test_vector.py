@@ -152,3 +152,30 @@ def test_lex_top_id(method, compare):
     # without helper variables, nv still covers top_id
     cnf = method([1], [2], top_id=20)
     assert cnf.nv == 20
+
+
+@pytest.mark.parametrize('method, compare', METHODS)
+def test_lex_vpool(method, compare):
+    # inputs taken from the pool: the pool moves past the helper variables
+    pool = IDPool()
+
+    a = [pool.id(('a', i)) for i in range(3)]
+    b = [pool.id(('b', i)) for i in range(3)]
+    cnf = check(method, compare, a, b, vpool=pool)
+    assert helper_vars(cnf, a, b) == [7, 8]
+    assert cnf.nv == pool.top == 8
+    assert pool.id('next') == 9
+
+    # occupied ranges are skipped, even when an input reaches into one
+    pool = IDPool(occupied=[[5, 10]])
+    a, b = [1, 2, 3], [4, 7, 8]
+    cnf = check(method, compare, a, b, vpool=pool)
+    assert helper_vars(cnf, a, b) == [11, 12]
+    assert cnf.nv == pool.top == 12
+
+    # inputs not taken from the pool are not handed out again
+    pool = IDPool()
+    a, b = [1, 2], [3, 4]
+    cnf = check(method, compare, a, b, vpool=pool)
+    assert helper_vars(cnf, a, b) == [5]
+    assert cnf.nv == pool.top == 5
