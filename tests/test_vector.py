@@ -65,6 +65,16 @@ def check(method, compare, a, b, **kwargs):
     return cnf
 
 
+def helper_vars(cnf, a, b):
+    """
+        The variables of the encoding that do not occur in the vectors.
+    """
+
+    inputs = set(abs(lit) for lit in a + b)
+
+    return sorted(set(abs(lit) for cl in cnf.clauses for lit in cl) - inputs)
+
+
 def test_lex_leq_example():
     # the example from the docstring of lex_leq
     cnf = VecEnc.lex_leq([1, 2], [3, 4])
@@ -110,3 +120,35 @@ def test_lex_lengths(method, compare, n, m):
 @pytest.mark.parametrize('a, b', SHARED)
 def test_lex_shared_variables(method, compare, a, b):
     check(method, compare, a, b)
+
+
+@pytest.mark.parametrize('n', range(1, 6))
+def test_lex_size(n):
+    a, b = vectors(n, n)
+
+    cnf = VecEnc.lex_leq(a, b)
+    assert len(helper_vars(cnf, a, b)) == n - 1
+    assert len(cnf.clauses) == 3 * n - 2
+
+    cnf = VecEnc.lex_lt(a, b)
+    assert len(helper_vars(cnf, a, b)) == n - 1
+    assert len(cnf.clauses) == 3 * n - 1
+
+
+@pytest.mark.parametrize('method, compare', METHODS)
+def test_lex_top_id(method, compare):
+    a, b = vectors(4, 4)
+
+    # the helper variables come right after top_id
+    cnf = check(method, compare, a, b, top_id=20)
+    assert helper_vars(cnf, a, b) == [21, 22, 23]
+    assert cnf.nv == 23
+
+    # a top_id below the input variables is raised above them
+    cnf = check(method, compare, a, b, top_id=3)
+    assert helper_vars(cnf, a, b) == [9, 10, 11]
+    assert cnf.nv == 11
+
+    # without helper variables, nv still covers top_id
+    cnf = method([1], [2], top_id=20)
+    assert cnf.nv == 20
