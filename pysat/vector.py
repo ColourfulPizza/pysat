@@ -57,7 +57,7 @@
 #
 #==============================================================================
 import numbers
-from pysat.formula import CNF
+from pysat.formula import CNF, IDPool
 
 
 #
@@ -182,6 +182,68 @@ class VecEnc(object):
         return cls._encode(a, b, True, top_id, vpool)
 
     @classmethod
+    def _check_vectors(cls, vectors):
+        """
+            A helper function to check that the given vectors contain only
+            literals and to return them as new lists of plain integers. The
+            caller's vectors are never modified. Any number of vectors can
+            be given, e.g. the rows of a matrix.
+
+            :param vectors: the vectors of literals of the constraint.
+            :type vectors: iterable(iterable(int))
+
+            :raises ValueError: if a vector contains something other than a
+                non-zero integer, e.g. ``0`` or ``True``.
+
+            :rtype: list(list(int))
+        """
+
+        # accept any iterables, e.g. tuples or numpy arrays, and work on new
+        # lists, so that the caller's vectors are never modified
+        vectors = [list(vec) for vec in vectors]
+
+        for vec in vectors:
+            for lit in vec:
+                # bool is a subclass of int, but True is not literal 1
+                integral = isinstance(lit, numbers.Integral)
+                if not integral or isinstance(lit, bool) or lit == 0:
+                    raise ValueError('Not a literal: {0!r}'.format(lit))
+
+        # integers of other types, e.g. from numpy, become plain ints
+        return [[int(lit) for lit in vec] for vec in vectors]
+
+    @classmethod
+    def _setup_pool(cls, vectors, top_id, vpool):
+        """
+            A helper function to set up the variable pool to be used, e.g.
+            for helper literals. If no pool is given, a new one is created,
+            which starts right above ``top_id``. The pool is moved above
+            the largest variable of the vectors, so that ``vpool.id()``
+            returns free identifiers.
+
+            :param vectors: the vectors of literals of the constraint.
+            :param top_id: top variable identifier used so far.
+            :param vpool: variable pool for counting the number of variables.
+
+            :type vectors: list(list(int))
+            :type top_id: integer or None
+            :type vpool: :class:`.IDPool`
+
+            :rtype: :class:`.IDPool`
+        """
+
+        assert not top_id or not vpool, (
+            'Use either a top id or a pool of variables but not both.')
+
+        if not vpool:
+            vpool = IDPool(start_from=(top_id or 0) + 1)
+
+        variables = [abs(lit) for vec in vectors for lit in vec]
+        vpool.top = max([vpool.top] + variables)
+
+        return vpool
+
+    @classmethod
     def _encode(cls, a, b, strict, top_id, vpool):
         """
             This is the method that implements both :meth:`lex_leq` and
@@ -206,25 +268,8 @@ class VecEnc(object):
             :rtype: :class:`pysat.formula.CNF`
         """
 
-        assert not top_id or not vpool, (
-            'Use either a top id or a pool of variables but not both.')
-
-        # accept any iterables, e.g. tuples or numpy arrays, and work on new
-        # lists, so that the caller's vectors are never modified
-        a, b = list(a), list(b)
-
-        for lit in a + b:
-            # bool is a subclass of int, but True is not meant as literal 1
-            integral = isinstance(lit, numbers.Integral)
-            if not integral or isinstance(lit, bool) or lit == 0:
-                raise ValueError('Not a literal: {0!r}'.format(lit))
-
-        # integers of other types, e.g. from numpy, become plain ints
-        a, b = [int(lit) for lit in a], [int(lit) for lit in b]
-
-        if top_id is None:
-            top_id = 0
-        top_id = max([top_id] + [abs(lit) for lit in a + b])
+        a, b = cls._check_vectors([a, b])
+        vpool = cls._setup_pool([a, b], top_id, vpool)
 
         # positions are compared up to the end of the shorter vector
         size = min(len(a), len(b))
@@ -235,18 +280,12 @@ class VecEnc(object):
         if len(a) != len(b):
             strict = len(a) > len(b)
 
-        if vpool:
-            vpool.top = max(top_id, vpool.top)
-            e = [vpool.id() for _ in range(size - 1)]
-            nv = vpool.top
-        else:
-            e = [i for i in range(top_id + 1, top_id + size)]
-            nv = max([top_id] + e)
+        e = [vpool.id() for _ in range(size - 1)]
 
         clauses = cls._build_clauses(a[:size], b[:size], e, strict)
 
         cnf = CNF(from_clauses=clauses)
-        cnf.nv = nv  # the largest variable used so far
+        cnf.nv = vpool.top  # the largest variable used so far
 
         return cnf
 
