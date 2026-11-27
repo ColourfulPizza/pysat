@@ -336,3 +336,33 @@ class VecEnc(object):
                 clauses.append(prefix + [-a[i], b[i]])
 
         return clauses
+
+    @classmethod
+    def hamming_distance(cls, a, b, lower=None, upper=None, top_id=None,
+                        vpool=None):
+        # lower and upper are integers
+        assert lower or upper, (
+                    'You need to define a lower or an upper bound.')
+
+        if len(a) != len(b):
+            raise ValueError("lengths should be equal??")
+
+        n = len(a)
+        vpool = cls._setup_pool([a, b], top_id, vpool)
+        (a, b) = cls._check_vectors([a,b])
+
+        x = [vpool.id() for _ in range(n)]
+        clauses = []
+        for ai, bi, xi in zip(a, b, x):
+            clauses += [[-ai, bi, xi],
+                        [ai, -bi, xi]]
+
+        
+        
+        # # helper literals
+        # consider x = a xor b
+        # c(i, k) = x[i] ? c(i-1,k-1) : c(i-1,k)
+        # to encode that: (!c(i - 1,k) or c(i,k))
+        # also: c(i,k) or !x[i] or !c(i-1,k - 1)
+        # !a or b or x
+        # a or !b or x
